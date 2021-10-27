@@ -36,11 +36,7 @@ public class UserProfileService {
         isImage(file);
         
         // 3. The user exists in database
-        UserProfile user = getUserProfiles()
-            .stream()
-            .filter(userProfile -> userProfile.getUserProfileId().equals(userProfileId))
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException(String.format("User profile %s not found", userProfileId)));
+        UserProfile user = getUserProfileOrThrow(userProfileId);
 
         // 4. Grab some metadata from file if any
         Map<String, String> metadata = new HashMap<>();
@@ -53,9 +49,26 @@ public class UserProfileService {
 
         try{
             fileStore.save(path, fileName, Optional.of(metadata), file.getInputStream());
+            user.setUserProfileImageLink(fileName);
         } catch (IOException e){
             throw new IllegalStateException(e);
         }
+    }
+
+    public byte[] downloadUserProfileImage(UUID userProfileId){
+        UserProfile user = getUserProfileOrThrow(userProfileId);
+        String path = String.format("%s/%s",
+                                    BucketName.PROFILE_IMAGE.getBucketName(),
+                                    user.getUserProfileId());
+        return user.getUserProfileImageLink().map(key -> fileStore.download(path, key)).orElse(new byte[0]);
+    }
+
+    private UserProfile getUserProfileOrThrow(UUID userProfileId){
+        return getUserProfiles()
+            .stream()
+            .filter(userProfile -> userProfile.getUserProfileId().equals(userProfileId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException(String.format("User profile %s not found", userProfileId)));
     }
 
     private void isFileEmpty(MultipartFile file){
